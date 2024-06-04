@@ -1,0 +1,17 @@
+h5py==3.8.0
+ipython==8.12.3
+kornia==0.6.12
+matplotlib==3.7.1
+matplotlib==3.6.3
+numpy==1.23.5
+opencv_contrib_python==4.5.4.60
+opencv_python==4.5.4.60
+opencv_python_headless==4.5.4.60
+Pillow==9.5.0
+Pillow==10.3.0
+pycolmap==0.6.1
+timm==0.9.2
+torch==2.0.0
+torchvision==0.15.1
+tqdm==4.65.0
+tqdm==4.64.1
