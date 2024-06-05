@@ -1,32 +1,18 @@
-# IMC2024-48th-Solution
+# 48th-Solution using AffNetHardNet in IMC2024
+
+![](./asset/imc2024-001.png)
 
 You can check IMC2024 here. [Image Matching Challenge 2024 - Hexathlon](https://www.kaggle.com/competitions/image-matching-challenge-2024)
 
+<br>
+
 # Competetion
 The goal of this competition is to construct precise 3D maps using sets of images in diverse scenarios and environments.
-
 The process of reconstructing a 3D model of an environment from a collection of images is called [Structure from Motion](https://en.wikipedia.org/wiki/Structure_from_motion) (**SfM**).
 
 Structure from Motion (SfM) is the name given to the procedure of reconstructing a 3D scene and simultaneously obtaining the camera poses of a camera w.r.t. the given scene. This means that, as the name suggests, we are creating the entire rigid structure from a set of images with different view points (or equivalently a camera in motion).
 
-<br>
-
-# Score
-
-I was ranked 18th in the PB score, but 48th in the Private score.
-Judging from the results, I think there was overfitting, also I think the main reason for this is the use of AffNetHardNet and the triangulation parameter settings.
-
-In particular, regarding model selection, most of the participants used [LightGlue](https://github.com/cvg/LightGlue)+[ALIKED](https://github.com/Shiaoming/ALIKED) (new matcher/detector models announced in 2023), and it actually seemed to be robust against private scores.
-However, I think the classic method using AffNetHardNet is also an interesting solution.
-
-| Medal | Public Score | Private Score |
-----|----|---- 
-| Gold Zone (12th) | 0.184 | 0.177 |
-| My Solution (48th) | **0.180** | **0.167** |
-| Silver Zone (50th) | 0.172 | 0.166 |
-| Blonze Zone (100th) | 0.151 | 0.158 |
-
-This is a score table for each medal zone and my solution.
+![](./asset/Structure-from-Motion-SfM-photogrammetric-principle-Source-Theia-sfmorg-2016.png)
 
 <br>
 
@@ -34,20 +20,22 @@ This is a score table for each medal zone and my solution.
 My solution consists of two parts.
 The first is **AffNetHardNet**, and the second is **Reconstruction**.
 
-Image of the structure will be soon later...
+Image of the structure will be update later...
 
 <br>
 
-# AffNetHardNet
+# 1. AffNetHardNet
 This AffNetHardNet solution was based on the [6th place solution of IMC2023](https://www.kaggle.com/competitions/image-matching-challenge-2023/discussion/417045).
 
 In SfM, key points must be detected in the image before 3D reconstruction. One of the key point detection methods is AffnetHardnet, which is a relatively classic method implemented in kornia, but by defining and implementing it as a unique module, it achieved certain results in this competition.
+
+![](./asset/keynet_affnet.jpg)
 
 The AffneteHardnet module consists of three stages: **detection**, **description**, and **matching**.
 
 <br>  
 
-## Detection
+## 1.1. Detectior
 Detect key points from images. We used four models: KeyNet, GFTT, DoG, and Harris. All can be used from [kornia](https://kornia.readthedocs.io/en/stable/feature.html#kornia.feature.KeyNet).
 
 ```python
@@ -64,8 +52,8 @@ As a result, the LB score increased by 0.01.
 
 <br>
 
-## Description
-The description is a 128-dimensional array based on detected keypoints.
+## 1.2. Descriptor
+The descriptor is a 128-dimensional array based on detected keypoints.
 
 ```python
 hardnet8 = KF.HardNet8(False).eval()
@@ -80,7 +68,7 @@ I tried other description models such as HardNet, HyNet, and multiple descriptio
 
 <br>
 
-## Matcher
+## 1.3. Matcher
 Finally, the two images are matched based on the detected key points and descriptions.
 
 ```python
@@ -98,18 +86,20 @@ dists, idxs = KF.match_adalam(
 For the matcher, we use [AdaLAM](https://kornia.readthedocs.io/en/stable/feature.html#kornia.feature.match_adalam).
 By using AdaLAM, matching can be performed regardless of image rotation, increasing accuracy.
 
-I also tried LightGlue, but it didn't work well with my detection/descriptor.
+I also tried [LightGlue](https://github.com/cvg/LightGlue), but it didn't work well with my detector/descriptor.
 
 <br>
 
-# Reconstruction
+# 2. Reconstruction
 We use [colmap](https://colmap.github.io/) for 3D reconstruction. By registering images, cameras, key points, matching information, etc., objects are reconstructed in 3D.
 
 Then, by obtaining the `R` and `T` of each camera, information on where the image was taken can be obtained, and the final score is calculated by evaluating it with the ground truth. There are also several steps when it comes to reconfiguration.
 
+![](./asset/sparse.png)
+
 <br>
 
-## Fundamental Metrices
+## 2.1. Fundamental Matrices
 Rather than just using the keypoint matching obtained in the above process, we need to exclude outliers.
 
 This process, called [RANSAC](https://en.wikipedia.org/wiki/Random_sample_consensus), can also use the pycolmap function `pycolmap.match_exhaustive`.
@@ -122,7 +112,7 @@ This time, I am using `cv2.findFundamentalMat` to run RANSAC.
 
 <br>
 
-## Focal Length
+## 2.2. Focal Length
 Actually, the reconstruction using pycolmap contains a large amount of randomness. In other words, even if reconstructions are performed under the same conditions, the scores will vary. One method to suppress this randomness is to use the focal length of the camera, which is introduced in [3rd solution of IMC2023](https://www.kaggle.com/competitions/image-matching-challenge-2023/discussion/417191).
 
 In IMC2023, some images contained [EXIF](https://en.wikipedia.org/wiki/Exif) ​​information. By referring to EXIF, you can obtain additional camera/image information such as focal length. However, the IMC2024 dataset did not include images with EXIF ​​information. Therefore, I implemented the code below to find the optimal focal length for each image.
@@ -143,7 +133,7 @@ By changing to this function, the score increased slightly, but the effect of re
 
 <br>
 
-## Triangulation
+## 2.3. Triangulation
 When performing reconfiguration with pycolmap, use `pycolmap.incremental_mapping` in version `0.6.1`. 
 And you can use `pycolmap.IncrementalPipelineOptions` as an option for each number.
 On the other hand, triangulation values ​​can be defined in function `pycolmap.IncrementalTriangulatorOptions`.
@@ -163,7 +153,7 @@ For datasets such as IMC2024 that are difficult to predict, it is possible that 
 
 <br>
 
-## Multi Run reconstruction
+## 2.4. Multi Run Reconstruction
 IMC2023 [2nd solution](https://www.kaggle.com/competitions/image-matching-challenge-2023/discussion/416873) also adopted a method of performing reconstruction multiple times in order to suppress the randomness of the colmap and select the best map reconstruction.
 
 After running it three times, we selected the map with the most registered images or the most 3D observation points.
@@ -214,3 +204,26 @@ for mul in range(multiple):
 - **Preprocessing to the input image. Rotation, cropping, pixel adjustment, Super Resolution, etc.**
 
   Rotate by 90, 180, 270 degrees, crop to a focused area of ​​key points with [DBSCAN](https://en.wikipedia.org/wiki/DBSCAN), or super-resolve low-resolution images with [SwinIR](https://github.com/JingyunLiang/SwinIR).
+
+<br>
+
+# Score
+
+![](./asset/imc2024-002.png)
+
+I was ranked 18th in the PB score, but 48th in the Private score.
+Judging from the results, I think there was overfitting, also I think the main reason for this is the use of AffNetHardNet and the triangulation parameter settings.
+
+In particular, regarding model selection, most of the participants used [LightGlue](https://github.com/cvg/LightGlue)+[ALIKED](https://github.com/Shiaoming/ALIKED) (new matcher/detector models announced in 2023), and it actually seemed to be robust against private scores.
+However, I think the classic method using AffNetHardNet is also an interesting solution.
+
+| Medal | Public Score | Private Score |
+----|----|---- 
+| Gold Zone (12th) | 0.184 | 0.177 |
+| My Solution (48th) | **0.180** | **0.167** |
+| Silver Zone (50th) | 0.172 | 0.166 |
+| Blonze Zone (100th) | 0.151 | 0.158 |
+
+This is a score table for each medal zone and my solution.
+
+<br>
